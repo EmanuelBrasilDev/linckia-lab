@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import Reveal from "@/components/ui/Reveal";
 import LiquidField from "@/components/servicos/LiquidField";
 import ServicesCatalog from "@/components/servicos/ServicesCatalog";
-import { BUDGET_NOTES, CONTACT_ENABLED, quoteHref } from "@/data/services";
+import { BUDGET_NOTES, quoteHref } from "@/data/services";
 
 export const metadata: Metadata = {
   title: "Serviços",
@@ -50,18 +51,14 @@ export default function Servicos() {
             aria-label="Sobre os valores"
             className="mx-auto mt-6 flex max-w-3xl gap-3 rounded-2xl border border-white/10 bg-abyss/60 p-5 text-sm leading-relaxed text-muted sm:p-6"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="mt-0.5 h-5 w-5 shrink-0 text-bio"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 11v5M12 7.5h.01" />
-            </svg>
+            <Image
+              unoptimized
+              src="/assets/shared/icons/information.webp"
+              width={20}
+              height={20}
+              className="mt-0.5 h-5 w-5 shrink-0"
+              alt=""
+            />
             <div className="space-y-2">
               <p>{BUDGET_NOTES.reference}</p>
               <p>{BUDGET_NOTES.extras}</p>
@@ -83,23 +80,12 @@ export default function Servicos() {
                 Conte o que você precisa e encontramos juntos o formato e o nível ideais
                 para o seu negócio.
               </p>
-              {CONTACT_ENABLED ? (
-                <Link
-                  href={quoteHref()}
-                  className="mt-9 inline-flex items-center justify-center gap-2 rounded-full bg-linckia px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_rgba(68,104,242,0.7)] transition-colors hover:bg-[#5576f5]"
-                >
-                  Solicitar orçamento
-                </Link>
-              ) : (
-                // ativado junto com a página /contato (CONTACT_ENABLED)
-                <p
-                  role="note"
-                  className="mx-auto mt-9 inline-flex items-center gap-2 rounded-full border border-dashed border-white/20 px-6 py-3 text-sm text-muted"
-                >
-                  <span className="h-2 w-2 rounded-full bg-bio" aria-hidden="true" />
-                  Canal de contato em breve
-                </p>
-              )}
+              <Link
+                href={quoteHref()}
+                className="mt-9 inline-flex items-center justify-center gap-2 rounded-full bg-linckia px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_rgba(68,104,242,0.7)] transition-colors hover:bg-[#5576f5]"
+              >
+                Solicitar orçamento
+              </Link>
             </div>
           </Reveal>
         </section>

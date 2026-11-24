@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { mountWebGLCanvas, releaseWebGLCanvas } from "@/components/graphics/webglCanvas";
 
 /**
  * Corrente digital global da Home.
@@ -20,8 +21,8 @@ import { useEffect, useRef } from "react";
  *
  * Desempenho:
  * - Um único loop rAF; nenhuma renderização React por quadro.
- * - Zero alocação por quadro: espinha, atributos, vértices e índices vivem em
- *   typed arrays reaproveitados; buffers da GPU só crescem (bufferSubData).
+ * - Espinha, atributos, vértices e índices vivem em typed arrays reaproveitados;
+ *   buffers da GPU só crescem (bufferSubData).
  * - Ondulações (serpentina/largura) são calculadas uma vez por amostra e
  *   compartilhadas por todas as linhas da camada, não por vértice.
  * - Tempo acumulado por deltaTime limitado: velocidade independente do FPS e
@@ -149,7 +150,7 @@ void main() {
 const FLOATS = 9; // x, y, r, g, b, a, across, profile, size
 
 /** typed array que só cresce (reaproveitado entre quadros) */
-function grow<T extends Float32Array | Float64Array | Uint32Array>(
+function grow<T extends Float32Array | Float64Array | Uint32Array | Uint16Array>(
   a: T,
   n: number,
   make: (n: number) => T,
@@ -162,14 +163,19 @@ function grow<T extends Float32Array | Float64Array | Uint32Array>(
 const f32 = (n: number) => new Float32Array(n);
 const f64 = (n: number) => new Float64Array(n);
 const u32 = (n: number) => new Uint32Array(n);
+const u16 = (n: number) => new Uint16Array(n);
+const distance = (dx: number, dy: number) => Math.sqrt(dx * dx + dy * dy);
 
 export default function CurrentField() {
-  const ref = useRef<HTMLCanvasElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const timeline = useRef<{ time: number; particleClock: number | null } | null>(null);
+  const [contextVersion, setContextVersion] = useState(0);
 
   useEffect(() => {
-    const canvas = ref.current;
-    const wrap = canvas?.parentElement;
-    if (!canvas || !wrap) return;
+    const host = ref.current;
+    const wrap = host?.parentElement;
+    if (!host || !wrap) return;
+    const canvas = mountWebGLCanvas(host, "pointer-events-none fixed inset-0 h-full w-full");
 
     const opts: WebGLContextAttributes = {
       alpha: true,
@@ -182,7 +188,10 @@ export default function CurrentField() {
     const gl2 = canvas.getContext("webgl2", opts);
     const gl: WebGLRenderingContext | WebGL2RenderingContext | null =
       gl2 ?? canvas.getContext("webgl", opts);
-    if (!gl) return;
+    if (!gl) {
+      releaseWebGLCanvas(canvas, gl);
+      return;
+    }
     const uintIndex = !!gl2 || !!gl.getExtension("OES_element_index_uint");
 
     // ---------- programa ----------
@@ -193,10 +202,18 @@ export default function CurrentField() {
       return s;
     };
     const prog = gl.createProgram()!;
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+    const vertexShader = compile(gl.VERTEX_SHADER, VS);
+    const fragmentShader = compile(gl.FRAGMENT_SHADER, FS);
+    gl.attachShader(prog, vertexShader);
+    gl.attachShader(prog, fragmentShader);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      gl.deleteProgram(prog);
+      releaseWebGLCanvas(canvas, gl);
+      return;
+    }
     gl.useProgram(prog);
     const aPos = gl.getAttribLocation(prog, "a_pos");
     const aCol = gl.getAttribLocation(prog, "a_col");
@@ -204,8 +221,10 @@ export default function CurrentField() {
     const uRes = gl.getUniformLocation(prog, "u_res");
     const uDpr = gl.getUniformLocation(prog, "u_dpr");
     const uPoints = gl.getUniformLocation(prog, "u_points");
-    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+    const vbo = gl.createBuffer();
+    const ibo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
     const stride = FLOATS * 4;
     gl.enableVertexAttribArray(aPos);
     gl.enableVertexAttribArray(aCol);
@@ -220,7 +239,8 @@ export default function CurrentField() {
     let vboBytes = 0; // capacidade alocada na GPU (só cresce)
     let iboBytes = 0;
 
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reduced = motion.matches;
     const fine = window.matchMedia("(pointer: fine)").matches;
 
     // ---------- layout ----------
@@ -249,6 +269,9 @@ export default function CurrentField() {
       const ch = Math.max(1, Math.round(vh * dpr));
       if (canvas.width !== cw) canvas.width = cw;
       if (canvas.height !== ch) canvas.height = ch;
+      gl.viewport(0, 0, cw, ch);
+      gl.uniform2f(uRes, vw, vh);
+      gl.uniform1f(uDpr, dpr);
       unit = mobile ? 0.62 : Math.max(0.75, Math.min(1.15, vw / 1440));
       ds = mobile ? 9 : 6;
 
@@ -266,7 +289,7 @@ export default function CurrentField() {
         const b = el.getBoundingClientRect();
         return { x: b.left - wr.left, y: b.top - wr.top, w: b.width, h: b.height };
       });
-      refTotal = 0; // recalibra a velocidade das partículas no próximo quadro
+      particleCount = -1;
     };
 
     const mapY = (y: number) => {
@@ -299,9 +322,11 @@ export default function CurrentField() {
     let CX = f64(0);
     let CY = f64(0);
     let RAW = f64(0);
+    let lengths = f64(0);
     let count = 0;
     let total = 0;
-    let refTotal = 0; // comprimento de referência (velocidade estável das partículas)
+    let particleCount = -1;
+    let particleClock = timeline.current?.particleClock ?? null;
 
     const buildSpine = (t: number) => {
       const path = mobile ? PATH_MOBILE : PATH_DESKTOP;
@@ -326,26 +351,28 @@ export default function CurrentField() {
         const x1 = CX[j], y1 = CY[j];
         const x2 = CX[j + 1], y2 = CY[j + 1];
         const x3 = CX[j + 2], y3 = CY[j + 2];
-        const t0 = 0;
-        const t1 = t0 + Math.max(1e-3, Math.sqrt(Math.hypot(x1 - x0, y1 - y0)));
-        const t2 = t1 + Math.max(1e-3, Math.sqrt(Math.hypot(x2 - x1, y2 - y1)));
-        const t3 = t2 + Math.max(1e-3, Math.sqrt(Math.hypot(x3 - x2, y3 - y2)));
-        const steps = Math.max(4, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 3));
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const chord = distance(dx, dy);
+        const d01 = Math.max(1e-3, Math.sqrt(distance(x1 - x0, y1 - y0)));
+        const d12 = Math.max(1e-3, Math.sqrt(chord));
+        const d23 = Math.max(1e-3, Math.sqrt(distance(x3 - x2, y3 - y2)));
+        // A mesma Catmull-Rom centrípeta em forma cúbica. Calcula as
+        // tangentes uma vez por trecho e avalia as amostras por Horner.
+        const startX = dx + d12 * ((x1 - x0) / d01 - (x2 - x0) / (d01 + d12));
+        const startY = dy + d12 * ((y1 - y0) / d01 - (y2 - y0) / (d01 + d12));
+        const endX = dx + d12 * ((x3 - x2) / d23 - (x3 - x1) / (d12 + d23));
+        const endY = dy + d12 * ((y3 - y2) / d23 - (y3 - y1) / (d12 + d23));
+        const bx = 3 * dx - 2 * startX - endX;
+        const by = 3 * dy - 2 * startY - endY;
+        const ax = startX + endX - 2 * dx;
+        const ay = startY + endY - 2 * dy;
+        const steps = Math.max(4, Math.ceil(chord / 3));
         RAW = grow(RAW, r + steps * 2 + 4, f64);
         for (let k = 0; k < steps; k++) {
-          const tt = t1 + ((t2 - t1) * k) / steps;
-          const a1x = ((t1 - tt) * x0 + (tt - t0) * x1) / (t1 - t0);
-          const a1y = ((t1 - tt) * y0 + (tt - t0) * y1) / (t1 - t0);
-          const a2x = ((t2 - tt) * x1 + (tt - t1) * x2) / (t2 - t1);
-          const a2y = ((t2 - tt) * y1 + (tt - t1) * y2) / (t2 - t1);
-          const a3x = ((t3 - tt) * x2 + (tt - t2) * x3) / (t3 - t2);
-          const a3y = ((t3 - tt) * y2 + (tt - t2) * y3) / (t3 - t2);
-          const b1x = ((t2 - tt) * a1x + (tt - t0) * a2x) / (t2 - t0);
-          const b1y = ((t2 - tt) * a1y + (tt - t0) * a2y) / (t2 - t0);
-          const b2x = ((t3 - tt) * a2x + (tt - t1) * a3x) / (t3 - t1);
-          const b2y = ((t3 - tt) * a2y + (tt - t1) * a3y) / (t3 - t1);
-          RAW[r++] = ((t2 - tt) * b1x + (tt - t1) * b2x) / (t2 - t1);
-          RAW[r++] = ((t2 - tt) * b1y + (tt - t1) * b2y) / (t2 - t1);
+          const u = k / steps;
+          RAW[r++] = ((ax * u + bx) * u + startX) * u + x1;
+          RAW[r++] = ((ay * u + by) * u + startY) * u + y1;
         }
       }
       RAW = grow(RAW, r + 2, f64);
@@ -353,9 +380,14 @@ export default function CurrentField() {
       RAW[r++] = CY[m - 2];
 
       // reamostragem por comprimento de arco (espaçamento uniforme = ds)
+      const segs = r / 2 - 1;
+      lengths = grow(lengths, segs, f64);
       let len = 0;
-      for (let i = 2; i < r; i += 2) {
-        len += Math.hypot(RAW[i] - RAW[i - 2], RAW[i + 1] - RAW[i - 1]);
+      for (let i = 0; i < segs; i++) {
+        const j = i * 2;
+        const segment = distance(RAW[j + 2] - RAW[j], RAW[j + 3] - RAW[j + 1]);
+        lengths[i] = segment;
+        len += segment;
       }
       total = len;
       count = Math.max(2, Math.floor(len / ds) + 1);
@@ -365,16 +397,15 @@ export default function CurrentField() {
       NY = grow(NY, count, f32);
       KA = grow(KA, count, f32);
       KT = grow(KT, count + 1, f64);
-      const segs = r / 2 - 1;
       let seg = 0;
       let segStart = 0;
-      let segLen = Math.hypot(RAW[2] - RAW[0], RAW[3] - RAW[1]);
+      let segLen = lengths[0];
       for (let i = 0; i < count; i++) {
         const target = i * ds;
         while (segStart + segLen < target && seg < segs - 1) {
           segStart += segLen;
           seg++;
-          segLen = Math.hypot(RAW[seg * 2 + 2] - RAW[seg * 2], RAW[seg * 2 + 3] - RAW[seg * 2 + 1]);
+          segLen = lengths[seg];
         }
         const f = segLen > 0 ? Math.min(1, (target - segStart) / segLen) : 0;
         SX[i] = RAW[seg * 2] + (RAW[seg * 2 + 2] - RAW[seg * 2]) * f;
@@ -387,7 +418,7 @@ export default function CurrentField() {
         const b = Math.min(count - 1, i + 1);
         const tx = SX[b] - SX[a];
         const ty = SY[b] - SY[a];
-        const l = Math.hypot(tx, ty) || 1;
+        const l = distance(tx, ty) || 1;
         NX[i] = -ty / l;
         NY[i] = tx / l;
       }
@@ -396,12 +427,9 @@ export default function CurrentField() {
       for (let i = 0; i < count; i++) {
         let k = 0;
         if (i > 0 && i < count - 1) {
-          const ta = Math.atan2(SY[i] - SY[i - 1], SX[i] - SX[i - 1]);
-          const tb = Math.atan2(SY[i + 1] - SY[i], SX[i + 1] - SX[i]);
-          let d = tb - ta;
-          if (d > Math.PI) d -= TAU;
-          if (d < -Math.PI) d += TAU;
-          k = d / ds;
+          const ax = SX[i] - SX[i - 1], ay = SY[i] - SY[i - 1];
+          const bx = SX[i + 1] - SX[i], by = SY[i + 1] - SY[i];
+          k = Math.atan2(ax * by - ay * bx, ax * bx + ay * by) / ds;
         }
         KT[i + 1] = KT[i] + k;
       }
@@ -422,15 +450,16 @@ export default function CurrentField() {
     };
 
     // ---------- buffers reaproveitados ----------
-    let vbuf = f32(FLOATS * 40000);
+    let vbuf = f32(FLOATS * 12000);
     let vcount = 0;
-    let tri = u32(60000); // índices de triângulos
+    let tri = u32(30000); // índices de triângulos
     let ti = 0;
-    let lin = u32(30000); // índices de linhas
+    let lin = u32(12000); // índices de linhas
     let li = 0;
-    let pbuf = f32(FLOATS * 4000); // pontos (vão para o fim do buffer de vértices)
+    let pbuf = f32(FLOATS * 2400); // pontos (vão para o fim do buffer de vértices)
     let pn = 0;
-    let maxV = uintIndex ? Infinity : 65000;
+    const maxV = uintIndex ? Infinity : 65000;
+    let indices16 = u16(0);
 
     const pushV = (
       x: number, y: number, r: number, g: number, b: number, a: number,
@@ -497,7 +526,8 @@ export default function CurrentField() {
         if (dx > fall) continue;
         const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
         if (dy > fall) continue;
-        f = Math.min(f, 0.22 + 0.78 * smooth(0, fall, Math.hypot(dx, dy)));
+        const d = distance(dx, dy);
+        if (d < fall) f = Math.min(f, 0.22 + 0.78 * smooth(0, fall, d));
       }
       return f;
     };
@@ -587,10 +617,13 @@ export default function CurrentField() {
     };
 
     // ---------- quadro ----------
-    const frame = (t: number) => {
+    const frame = (t: number, dt: number) => {
       if (!vw || !vh || !secTop.length) return;
       buildSpine(t);
-      if (!refTotal) refTotal = total;
+      if (total > 0) particleClock = particleClock === null ? t / total : particleClock + dt / total;
+      if (particleCount < 0) {
+        particleCount = Math.min(particles.length, Math.floor(total / (mobile ? 320 : 230)));
+      }
 
       scroll = window.scrollY - wrapTop; // topo da viewport em coords da Home
       const y0 = scroll - 380;
@@ -703,10 +736,9 @@ export default function CurrentField() {
         // 5) partículas viajando ao longo da própria curva. A fase é uma fração
         // do comprimento (estável quando a curva respira) e a posição é
         // interpolada entre amostras — deslocamento contínuo, sem degraus.
-        const pc = Math.min(particles.length, Math.floor(total / (mobile ? 320 : 230)));
-        for (let q = 0; q < pc; q++) {
+        for (let q = 0; q < particleCount; q++) {
           const p = particles[q];
-          const u = (((p.a0 + (t * p.sp) / refTotal) % 1) + 1) % 1;
+          const u = (p.a0 + p.sp * (particleClock ?? 0)) % 1;
           const fi = (u * total) / ds;
           const i = Math.floor(fi);
           if (i < i0 || i + 1 > i1) continue;
@@ -792,11 +824,8 @@ export default function CurrentField() {
       }
 
       // ---------- desenho ----------
-      gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (!vcount) return;
-      gl.uniform2f(uRes, vw, vh);
-      gl.uniform1f(uDpr, dpr);
 
       // buffers da GPU só crescem; o conteúdo é atualizado no lugar
       const vBytes = vcount * FLOATS * 4;
@@ -804,19 +833,29 @@ export default function CurrentField() {
         vboBytes = Math.ceil(vBytes * 1.5);
         gl.bufferData(gl.ARRAY_BUFFER, vboBytes, gl.DYNAMIC_DRAW);
       }
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf.subarray(0, vcount * FLOATS));
+      if (gl2) gl2.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf, 0, vcount * FLOATS);
+      else gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf.subarray(0, vcount * FLOATS));
 
       const totalIdx = ti + li;
       if (totalIdx) {
         tri = grow(tri, totalIdx, u32);
         tri.set(lin.subarray(0, li), ti); // linhas logo após os triângulos
-        const idx = uintIndex ? tri.subarray(0, totalIdx) : Uint16Array.from(tri.subarray(0, totalIdx));
         const bytes = uintIndex ? 4 : 2;
         if (totalIdx * bytes > iboBytes) {
           iboBytes = Math.ceil(totalIdx * bytes * 1.5);
           gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, iboBytes, gl.DYNAMIC_DRAW);
         }
-        gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, idx);
+        if (gl2) {
+          gl2.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, tri, 0, totalIdx);
+        } else {
+          const source = tri.subarray(0, totalIdx);
+          if (uintIndex) gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, source);
+          else {
+            indices16 = grow(indices16, totalIdx, u16);
+            indices16.set(source);
+            gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, indices16.subarray(0, totalIdx));
+          }
+        }
         const type = uintIndex ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
         gl.uniform1f(uPoints, 0);
         if (ti) gl.drawElements(gl.TRIANGLES, ti, type, 0);
@@ -829,48 +868,10 @@ export default function CurrentField() {
     };
 
     // ---------- ciclo de vida ----------
-    let t = reduce ? 14 : 0; // 14 = tempo do quadro estático (reduced motion)
-    let running = !reduce;
-    let visible = true;
-    const redraw = () => frame(t);
-
-    measure();
-    const ro = new ResizeObserver(() => {
-      measure();
-      if (!running) redraw();
-    });
-    ro.observe(wrap);
-    ro.observe(canvas);
-
-    // só trabalha enquanto a Home estiver na tela
-    const io = new IntersectionObserver(([e]) => {
-      visible = e.isIntersecting;
-      if (!visible) gl.clear(gl.COLOR_BUFFER_BIT);
-      else if (!running) redraw();
-    });
-    io.observe(wrap);
-
-    // com reduced motion não há loop: redesenha o quadro estático no scroll
-    let scrollRaf = 0;
-    const onScroll = () => {
-      if (running) return;
-      cancelAnimationFrame(scrollRaf);
-      scrollRaf = requestAnimationFrame(redraw);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    const onMove = (e: PointerEvent) => {
-      mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
-      mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
-    };
-    if (fine && !reduce) window.addEventListener("pointermove", onMove, { passive: true });
-
-    const onLost = (e: Event) => {
-      e.preventDefault();
-      running = false;
-      maxV = 0;
-    };
-    canvas.addEventListener("webglcontextlost", onLost);
+    let t = timeline.current?.time ?? (reduced ? 14 : 0);
+    let visible = false;
+    let lost = false;
+    let needsMeasure = true;
 
     // qualidade adaptativa: janelas de 2 s; só piora (nunca oscila) e ignora
     // quadros de navegador estrangulado (> 100 ms) e telas de alta frequência
@@ -887,15 +888,30 @@ export default function CurrentField() {
       winFrames = winSlow = winTime = 0;
       if (!slow) return;
       quality++;
-      measure();
+      needsMeasure = true;
     };
 
     let raf = 0;
-    let last = 0; // 0 = sem quadro anterior (início ou retomada)
+    let last = 0;
+    const syncFrame = () => {
+      if (!visible || document.hidden || lost) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+        last = 0;
+        winFrames = winSlow = winTime = 0;
+      } else if (!raf) {
+        raf = requestAnimationFrame(loop);
+      }
+    };
     const loop = (now: number) => {
-      raf = requestAnimationFrame(loop);
-      if (!running || !visible || document.hidden) {
-        last = 0; // a pausa não conta: ao voltar, continua de onde parou
+      raf = 0;
+      if (!visible || document.hidden || lost) return;
+      if (needsMeasure) {
+        measure();
+        needsMeasure = false;
+      }
+      if (reduced) {
+        frame(t, 0);
         return;
       }
       const dtMs = last ? now - last : 0;
@@ -907,27 +923,68 @@ export default function CurrentField() {
       mouse.x += (mouse.tx - mouse.x) * k;
       mouse.y += (mouse.ty - mouse.y) * k;
       t += dt;
-      frame(t);
+      frame(t, dt);
+      syncFrame();
     };
-    if (running) raf = requestAnimationFrame(loop);
-    else redraw();
+
+    const ro = new ResizeObserver(() => {
+      needsMeasure = true;
+      syncFrame();
+    });
+    ro.observe(wrap);
+    ro.observe(canvas);
+    const io = new IntersectionObserver(([e]) => {
+      visible = e.isIntersecting;
+      if (!visible && !lost) gl.clear(gl.COLOR_BUFFER_BIT);
+      syncFrame();
+    });
+    io.observe(wrap);
+
+    const onMove = (e: PointerEvent) => {
+      mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
+    };
+    const syncMotion = () => {
+      last = 0;
+      reduced = motion.matches;
+      if (reduced) {
+        window.addEventListener("scroll", syncFrame, { passive: true });
+        window.removeEventListener("pointermove", onMove);
+      } else {
+        window.removeEventListener("scroll", syncFrame);
+        if (fine) window.addEventListener("pointermove", onMove, { passive: true });
+      }
+      syncFrame();
+    };
+    const onLost = (event: Event) => {
+      event.preventDefault();
+      lost = true;
+      syncFrame();
+    };
+    const onRestored = () => setContextVersion((version) => version + 1);
+    canvas.addEventListener("webglcontextlost", onLost);
+    canvas.addEventListener("webglcontextrestored", onRestored);
+    document.addEventListener("visibilitychange", syncFrame);
+    motion.addEventListener("change", syncMotion);
+    syncMotion();
 
     return () => {
       cancelAnimationFrame(raf);
-      cancelAnimationFrame(scrollRaf);
+      timeline.current = { time: t, particleClock };
       ro.disconnect();
       io.disconnect();
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", syncFrame);
       window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("visibilitychange", syncFrame);
+      motion.removeEventListener("change", syncMotion);
       canvas.removeEventListener("webglcontextlost", onLost);
+      canvas.removeEventListener("webglcontextrestored", onRestored);
+      gl.deleteBuffer(vbo);
+      gl.deleteBuffer(ibo);
+      gl.deleteProgram(prog);
+      releaseWebGLCanvas(canvas, gl);
     };
-  }, []);
+  }, [contextVersion]);
 
-  return (
-    <canvas
-      ref={ref}
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 h-full w-full"
-    />
-  );
+  return <div ref={ref} aria-hidden="true" className="contents" />;
 }

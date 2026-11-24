@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
@@ -15,12 +16,10 @@ import {
 import Reveal, { holdRevealReset } from "@/components/ui/Reveal";
 import ServiceIcon from "./ServiceIcon";
 import {
-  CONTACT_ENABLED,
   SERVICES,
   formatPrice,
   quoteHref,
   startingPrice,
-  type LevelId,
   type Service,
   type ServiceId,
 } from "@/data/services";
@@ -164,22 +163,40 @@ function ServiceCard({
   onToggle: () => void;
 }) {
   const ref = useRef<HTMLElement | null>(null);
+  const hoverFrame = useRef(0);
+  const pointer = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(hoverFrame.current);
+      hoverFrame.current = 0;
+    };
+  }, []);
 
   // inclinação 2.5D + luz que acompanha o mouse (sem estado React por movimento)
-  const onMove = (e: PointerEvent<HTMLElement>) => {
-    if (e.pointerType !== "mouse") return;
+  const paintHover = () => {
+    hoverFrame.current = 0;
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
+    if (!r.width || !r.height) return;
+    const x = (pointer.current.x - r.left) / r.width;
+    const y = (pointer.current.y - r.top) / r.height;
     el.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`);
     el.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
     el.style.setProperty("--rx", `${((0.5 - y) * 4).toFixed(2)}deg`);
     el.style.setProperty("--ry", `${((x - 0.5) * 5).toFixed(2)}deg`);
-    el.dataset.hover = "true";
+    if (el.dataset.hover !== "true") el.dataset.hover = "true";
+  };
+  const onMove = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType !== "mouse") return;
+    pointer.current.x = e.clientX;
+    pointer.current.y = e.clientY;
+    if (!hoverFrame.current) hoverFrame.current = requestAnimationFrame(paintHover);
   };
   const onLeave = () => {
+    cancelAnimationFrame(hoverFrame.current);
+    hoverFrame.current = 0;
     const el = ref.current;
     if (!el) return;
     el.style.removeProperty("--rx");
@@ -288,7 +305,10 @@ function PanelSlot({
   useEffect(() => {
     const el = innerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setHeight(el.offsetHeight));
+    const ro = new ResizeObserver(([entry]) => {
+      const height = entry.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight;
+      setHeight(Math.round(height));
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -377,7 +397,17 @@ function ServicePanel({
               className="lk-rise lk-level flex flex-col rounded-2xl p-5"
               style={{ "--d": `${110 + i * 90}ms` } as CSSProperties}
             >
-              <h4 className="font-display text-lg font-semibold text-ink">{level.name}</h4>
+              <h4 className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
+                <Image
+                  unoptimized
+                  src={`/assets/services/levels/${level.id}.webp`}
+                  width={26}
+                  height={26}
+                  className="h-[26px] w-[26px] shrink-0 object-contain"
+                  alt=""
+                />
+                {level.name}
+              </h4>
               <p className="mt-1 text-sm leading-relaxed text-muted">{level.summary}</p>
               <p className="mt-4 leading-none">
                 <span className="block text-xs text-muted">A partir de</span>
@@ -405,7 +435,9 @@ function ServicePanel({
                 ))}
               </ul>
               <div className="mt-auto pt-5">
-                <QuoteAction service={service.id} level={level.id} />
+                <Link href={quoteHref(service.id, level.id)} className="lk-quote">
+                  Solicitar orçamento
+                </Link>
               </div>
             </li>
           ))}
@@ -423,27 +455,5 @@ function ServicePanel({
         </div>
       </div>
     </section>
-  );
-}
-
-/**
- * Botão de orçamento. Já aponta para /contato?servico=…&nivel=…, mas só é
- * ativado quando CONTACT_ENABLED = true (ver src/data/services.ts).
- */
-function QuoteAction({ service, level }: { service: ServiceId; level: LevelId }) {
-  if (CONTACT_ENABLED) {
-    return (
-      <Link href={quoteHref(service, level)} className="lk-quote">
-        Solicitar orçamento
-      </Link>
-    );
-  }
-  return (
-    <button type="button" disabled className="lk-quote" title="Disponível em breve">
-      Solicitar orçamento
-      <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.7rem] font-medium text-muted">
-        em breve
-      </span>
-    </button>
   );
 }

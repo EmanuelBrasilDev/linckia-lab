@@ -1,0 +1,471 @@
+.contact {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: 100svh;
+  background: var(--abyss);
+  color-scheme: dark;
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(1.75rem, 3.8vw, 4rem);
+  width: min(100%, 104rem);
+  margin-inline: auto;
+  padding: clamp(8.25rem, 10vw, 10.5rem) clamp(3rem, 7.5vw, 8rem) clamp(5.25rem, 6.2vw, 7rem);
+}
+
+.intro { padding-top: clamp(0.5rem, 1.6vw, 1.75rem); }
+
+.eyebrow {
+  color: var(--bio);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+.title {
+  max-width: 11em;
+  margin-top: 0.75rem;
+  color: #f4f7ff;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(2.7rem, 4.25vw, 4.75rem);
+  font-weight: 700;
+  line-height: 0.99;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  text-shadow: 0 2px 26px #06122590;
+}
+
+.title span {
+  display: block;
+  color: var(--bio);
+  text-shadow: 0 0 28px #00d9c132;
+}
+
+.description {
+  max-width: 34rem;
+  margin-top: clamp(1.2rem, 2.2vw, 1.8rem);
+  color: #dbe8fa;
+  font-size: clamp(1rem, 1.38vw, 1.28rem);
+  line-height: 1.6;
+}
+
+.description::before {
+  display: block;
+  width: 4.5rem;
+  height: 3px;
+  margin-bottom: 1.25rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--bio), var(--linckia));
+  content: "";
+}
+
+.channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.65rem, 1.25vw, 1.2rem);
+  max-width: 34rem;
+  margin-top: clamp(1.6rem, 3vw, 2.65rem);
+}
+
+.channels li { display: flex; min-width: 0; }
+
+.channel,
+.form {
+  border: 1px solid #61baff65;
+  background: radial-gradient(ellipse at 3% 0%, #1a65974d, transparent 55%),
+    linear-gradient(145deg, #0a2b49e8, #061930e8 63%, #123555d9);
+}
+
+.channel {
+  display: grid;
+  align-content: start;
+  flex: 1;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: clamp(0.8rem, 1.6vw, 1.35rem);
+  border-radius: 1.1rem;
+  box-shadow: inset 0 1px 1px #40dded22, 0 0.85rem 2rem #030b2033;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.channel:hover,
+.channel:focus-visible {
+  border-color: #25e4d4b0;
+  box-shadow: inset 0 1px 1px #40dded44, 0 0.85rem 2rem #030b2080;
+}
+
+.channel img { margin-bottom: 0.3rem; object-fit: contain; }
+
+.channelTitle {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.1rem, 1.4vw, 1.32rem);
+  font-weight: 600;
+}
+
+.channelDetail {
+  overflow-wrap: anywhere;
+  color: #dce8f8;
+  font-size: clamp(0.78rem, 1.15vw, 0.99rem);
+}
+
+.channelHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  color: #8df1e5;
+  font-size: 0.75rem;
+}
+
+.channelHint span { font-size: 1rem; line-height: 1; }
+
+/* Reuse Reveal for opacity while keeping the form stationary and immediately
+   visible to someone who enters it with the keyboard. */
+.contact .layout .formReveal { transform: none; }
+.layout .formReveal:focus-within { opacity: 1; transition: none; }
+
+.form {
+  position: relative;
+  padding: clamp(1.25rem, 2.6vw, 2.5rem);
+  border-radius: clamp(1.25rem, 2.1vw, 1.9rem);
+  background: radial-gradient(ellipse at 0% 0%, #2688bd4d, transparent 46%),
+    radial-gradient(ellipse at 91% 0%, #03bdb840, transparent 42%),
+    linear-gradient(145deg, #0a2947f0, #05182de8 58%, #102d51ed);
+  box-shadow: inset 0 1px 1px #7cdeff50, inset 0 0 1.8rem #3f91ec20, 0 1.35rem 4rem #020b2273;
+}
+
+.form::before,
+.form::after {
+  position: absolute;
+  right: 9%;
+  left: 8%;
+  height: 1px;
+  border-radius: 100%;
+  content: "";
+  pointer-events: none;
+}
+
+.form::before {
+  top: 0;
+  background: linear-gradient(90deg, transparent, #8adfff9e 14%, transparent 35%, transparent 64%, #40ffec, transparent);
+  box-shadow: 0 0.25rem 1.2rem #00d9c14d;
+}
+
+.form::after {
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 17%, #42ffecaf 54%, transparent 83%);
+  box-shadow: 0 -0.25rem 1.2rem #00d9c159;
+}
+
+.form h2 {
+  color: #f4f7ff;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.65rem, 2.3vw, 2.1rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.formDescription {
+  margin-top: 0.45rem;
+  color: #c8d8ed;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.9rem, 1.5vw, 1.3rem) clamp(0.75rem, 1.5vw, 1.35rem);
+  margin-top: 1.55rem;
+}
+
+.field { display: grid; align-self: start; gap: 0.42rem; min-width: 0; }
+.fullField { grid-column: 1 / -1; }
+.field label { color: #eef5ff; font-size: 0.875rem; font-weight: 600; }
+.field label span { color: #a0eee8; }
+
+.field :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.85rem;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid #5a94cf9c;
+  border-radius: 0.72rem;
+  background-color: #0c2c49b8;
+  box-shadow: inset 0 0 1rem #528bd318;
+  color: #f2f7ff;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  transition: background-color 170ms, border-color 170ms, box-shadow 170ms;
+}
+
+.field :is(input, textarea)::placeholder { color: #b1c5dc; opacity: 1; }
+.field select { appearance: none; padding-right: 2rem; }
+.field:has(select) { position: relative; }
+
+.field:has(select)::after {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 1.22rem;
+  width: 0.46rem;
+  height: 0.46rem;
+  rotate: 45deg;
+  border-right: 1.5px solid #d4eaff;
+  border-bottom: 1.5px solid #d4eaff;
+  content: "";
+  pointer-events: none;
+}
+
+.field select:has(option[value=""]:checked) { color: #b1c5dc; }
+.field option { background: #102942; color: #f2f7ff; }
+.field textarea { min-height: 6.45rem; resize: vertical; }
+
+.field :is(input, textarea):not(:placeholder-shown),
+.field select:has(option:not([value=""]):checked) { background-color: #102f4d; }
+.field :is(input, select, textarea):hover { border-color: #8bcaff; }
+
+.field :is(input, select, textarea):focus {
+  border-color: #68f4e3;
+  outline: 2px solid #00d9c159;
+  outline-offset: 1px;
+  box-shadow: inset 0 0 1.25rem #3c94b225;
+}
+
+.field :is(input, select, textarea):user-invalid { border-color: #ff9dba; }
+
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.5rem, 1.4vw, 1rem);
+  width: 100%;
+  min-height: 3.35rem;
+  margin-top: 1.45rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #729bff;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, #3066e7 0%, #1e48cf 52%, #2533ae 100%);
+  box-shadow: inset 0 1px 0 #a0deff70, inset 0 0 1rem #6d8aff55, 0 0.7rem 1.8rem #153ac953;
+  color: #fff;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1rem, 1.5vw, 1.22rem);
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: center;
+  transition: background-color 170ms, box-shadow 170ms;
+}
+
+.submit span { color: #5fffee; font-size: 1.35em; line-height: 1; }
+.submit:hover:not(:disabled) { box-shadow: inset 0 0 1.45rem #83a3ff8c, 0 0.75rem 2rem #214dda95; }
+
+.submitHint {
+  margin-top: 0.7rem;
+  color: #b9cee7;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.scene {
+  position: absolute;
+  inset: 4rem 0 0;
+  overflow: hidden;
+  background: #07172c;
+  pointer-events: none;
+}
+
+.water,
+.rays,
+.shade,
+.terrain,
+.marine,
+.particles { position: absolute; inset: 0; }
+
+.water {
+  inset: -0.45rem;
+  background: url("/assets/contact/environment/ocean-background.webp") center 44% / cover no-repeat;
+  translate: 0px 0px;
+  transition: translate 0.9s ease-out;
+}
+
+.rays {
+  inset: -8% 0 15%;
+  background: conic-gradient(from 149deg at 51% 0%,
+    transparent 0deg, #2cbaed38 5deg, transparent 12deg,
+    #45c7ed29 18deg, transparent 25deg, #57cbf02e 29deg,
+    transparent 37deg, #1bb8ed30 45deg, transparent 53deg);
+  mask-image: linear-gradient(#000, #000a 37%, transparent 92%);
+  transform-origin: 51% 0;
+  animation: ray-drift 18s ease-in-out infinite alternate;
+}
+
+.shade {
+  background:
+    linear-gradient(180deg, var(--abyss), transparent 5.6rem, transparent 87%, var(--abyss)),
+    radial-gradient(ellipse at 48% 46%, #06142602 16%, #030b1b57 84%),
+    linear-gradient(90deg, #06132967, transparent 61%, #06132942);
+}
+
+.particles { inset: -1rem; animation: particles-drift 23s ease-in-out infinite alternate; }
+.particles[data-depth="1"] { animation-duration: 34s; animation-delay: -12s; }
+.particles[data-depth="2"] { animation-duration: 48s; animation-delay: -27s; }
+.particles i { position: absolute; width: 2px; height: 2px; border-radius: 100%; background: #74d9ff; }
+.particles[data-depth="1"] i { width: 1px; height: 1px; background: #cbebff; }
+.particles[data-depth="2"] i { width: 3px; height: 3px; background: #48c1ed; }
+
+.terrain {
+  translate: 0px 0px;
+  transition: translate 0.8s ease-out;
+}
+
+.terrain > div {
+  position: absolute;
+  aspect-ratio: 1.65;
+  background-position: bottom;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.rocksLeft,
+.rocksRight { background-image: url("/assets/contact/environment/ocean-rocks.webp"); }
+.rocksLeft { left: -12%; bottom: -4%; width: clamp(20rem, 42vw, 52rem); opacity: 0.88; }
+.rocksRight { right: -14%; bottom: -2%; width: clamp(17rem, 36vw, 45rem); scale: -1 1; opacity: 0.72; }
+
+.coralLeft,
+.coralRight {
+  background-image: url("/assets/contact/environment/ocean-coral.webp");
+  animation: coral-glow 11s ease-in-out infinite alternate;
+}
+
+.coralLeft { left: 3.6%; bottom: 8%; width: clamp(7rem, 13vw, 14rem); rotate: -8deg; }
+.coralRight { right: 2.2%; bottom: 7%; width: clamp(5rem, 9vw, 11rem); rotate: 12deg; scale: -1 1; animation-delay: -6s; }
+
+.marine {
+  translate: 0px 0px;
+  transition: translate 1s ease-out;
+}
+
+.marine > div { position: absolute; left: 0; aspect-ratio: 2.25; opacity: 0; }
+.marine i { display: block; width: 100%; height: 100%; background: center / contain no-repeat; }
+.manta { top: 7%; width: clamp(7rem, 13vw, 14rem); animation: manta-cross 62s linear -20s infinite; }
+.manta i { position: relative; }
+.manta i::before,
+.manta i::after {
+  position: absolute;
+  inset: 0;
+  background: url("/assets/contact/marine-life/manta-ray.webp") center / contain no-repeat;
+  transform-origin: 50% 52%;
+  content: "";
+  animation: manta-wing 5.8s ease-in-out -2s infinite;
+}
+.manta i::before { clip-path: inset(0 0 48%); }
+.manta i::after { clip-path: inset(51% 0 0); animation-delay: -1.5s; }
+.shark { top: 30%; width: clamp(6rem, 13vw, 14rem); animation: shark-cross 103s linear -20s infinite; }
+.shark i { background-image: url("/assets/contact/marine-life/shark.webp"); animation: fins 5.2s ease-in-out infinite; }
+.school { top: 77%; width: clamp(7rem, 15vw, 15rem); animation: school-cross 62s linear -25s infinite; }
+.school i { background-image: url("/assets/contact/marine-life/fish-school.webp"); animation: fins 6s ease-in-out -2s infinite; }
+.fish { top: 74%; width: clamp(1.4rem, 3.4vw, 3.75rem); animation: school-cross 62s linear -28s infinite; }
+.fish i { background-image: url("/assets/contact/marine-life/reef-fish.webp"); animation: fins 2.4s ease-in-out infinite; }
+
+.scene[data-paused="true"] *,
+.scene[data-paused="true"] *::before,
+.scene[data-paused="true"] *::after { animation-play-state: paused; }
+
+@keyframes ray-drift {
+  from { transform: rotate(-3deg) scaleX(0.92); opacity: 0.44; }
+  to { transform: rotate(4deg) scaleX(1.09); opacity: 0.8; }
+}
+
+@keyframes particles-drift {
+  from { transform: translate3d(-7px, 12px, 0); }
+  to { transform: translate3d(25px, -18px, 0); }
+}
+
+@keyframes coral-glow { from { opacity: 0.64; } to { opacity: 0.92; } }
+
+@keyframes manta-cross {
+  0% { transform: translate3d(106vw, 0, 0) rotate(2deg); opacity: 0; }
+  12% { opacity: 0.59; }
+  29% { transform: translate3d(50vw, 1.1rem, 0) rotate(-5deg); opacity: 0.61; }
+  47% { transform: translate3d(19vw, -0.7rem, 0) rotate(3deg); opacity: 0.4; }
+  63%, 100% { transform: translate3d(-14rem, 0, 0) rotate(-4deg); opacity: 0; }
+}
+
+@keyframes shark-cross {
+  0% { transform: translate3d(-14rem, 0, 0) rotate(-2deg); opacity: 0; }
+  17% { opacity: 0.25; }
+  38% { transform: translate3d(63vw, 2rem, 0) rotate(2deg); opacity: 0.28; }
+  65%, 100% { transform: translate3d(103vw, -0.5rem, 0) rotate(-1deg); opacity: 0; }
+}
+
+@keyframes school-cross {
+  0% { transform: translate3d(104vw, 0, 0) rotate(1deg); opacity: 0; }
+  22% { opacity: 0.5; }
+  42% { transform: translate3d(41vw, 1.4rem, 0) rotate(-4deg); opacity: 0.54; }
+  59% { transform: translate3d(11vw, -0.6rem, 0) rotate(2deg); opacity: 0.39; }
+  72%, 100% { transform: translate3d(-15rem, 0, 0); opacity: 0; }
+}
+
+@keyframes fins {
+  0%, 100% { transform: translateY(0) rotateY(-9deg); }
+  35% { transform: translateY(-4%) rotateY(13deg); }
+  67% { transform: translateY(3%) rotateY(-5deg); }
+}
+
+@keyframes manta-wing {
+  0%, 100% { transform: scaleY(1); }
+  36% { transform: scaleY(0.78); }
+  68% { transform: scaleY(1.07); }
+}
+
+@media (max-width: 75rem) {
+  .layout { gap: 1.75rem; padding-inline: clamp(1.35rem, 4vw, 2.6rem); }
+}
+
+@media (max-width: 63.99rem) {
+  .title { font-size: clamp(2.6rem, 5.4vw, 4rem); }
+  .channel { padding-inline: 0.85rem; }
+}
+
+@media (max-width: 56rem) {
+  .layout { grid-template-columns: minmax(0, 1fr); max-width: 39rem; padding-top: 7.3rem; }
+  .intro { padding-top: 0; }
+  .title { font-size: clamp(3rem, 8.7vw, 4.35rem); }
+  .channels { margin-top: 1.6rem; }
+  .water { background-image: url("/assets/contact/environment/ocean-background-mobile.webp"); background-position: center top; }
+  .scene { mask-image: linear-gradient(#000 95%, transparent); }
+  .rocksLeft { left: -28%; bottom: -1.5%; }
+  .rocksRight { right: -28%; bottom: -1%; }
+  .coralLeft { left: 0; bottom: 3%; }
+  .coralRight { right: 0; bottom: 3%; }
+  .shark, .fish, .particles[data-depth="2"] { display: none; animation: none; }
+  .shark i, .fish i { background-image: none; }
+  .manta { top: 4%; }
+  .school { top: 90%; }
+}
+
+@media (max-width: 32rem) {
+  .layout { padding-inline: 1.15rem; }
+  .form { padding: 1.2rem; }
+  .fields { grid-template-columns: minmax(0, 1fr); margin-top: 1.3rem; }
+  .field :is(input, select, textarea) { font-size: 1rem; }
+  .channel img { width: 2.1rem; height: 2.1rem; }
+  .channelHint { font-size: 0.68rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene *, .scene *::before, .scene *::after { animation: none !important; transition: none !important; }
+  .rays { opacity: 0.53; }
+  .manta { opacity: 0.46 !important; transform: translateX(45vw); }
+  .school { opacity: 0.45 !important; transform: translateX(29vw); }
+}

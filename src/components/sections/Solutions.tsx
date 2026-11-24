@@ -1,35 +1,27 @@
-import type { ReactNode } from "react";
 import Section from "@/components/ui/Section";
 import Reveal from "@/components/ui/Reveal";
-import {
-  LandingIllustration,
-  SiteIllustration,
-  SystemsIllustration,
-} from "./SolutionIllustrations";
+import ServiceIcon from "@/components/servicos/ServiceIcon";
+import type { ServiceIconName } from "@/data/services";
 
 const cards: {
   title: string;
   text: string;
-  icon: ReactNode;
-  art: ReactNode;
+  icon: ServiceIconName;
 }[] = [
   {
     title: "Sites institucionais",
     text: "Presença digital profissional.",
-    icon: <path d="M4 10.5 12 4l8 6.5V20h-5v-5.5H9V20H4z" />,
-    art: <SiteIllustration />,
+    icon: "site",
   },
   {
     title: "Landing pages",
     text: "Páginas focadas em ofertas e campanhas.",
-    icon: <path d="M4 4h16v16H4zM4 10h16M10 10v10" />,
-    art: <LandingIllustration />,
+    icon: "landing",
   },
   {
     title: "Soluções web personalizadas",
     text: "Plataformas para necessidades específicas.",
-    icon: <path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" />,
-    art: <SystemsIllustration />,
+    icon: "system",
   },
 ];
 
@@ -88,24 +80,13 @@ export default function Solutions() {
                   >
                     <div className="absolute inset-x-6 bottom-0 h-8 rounded-full bg-linckia/40 blur-2xl" />
                     <div className="relative h-full transition-transform duration-700 ease-out [transform:rotateY(-14deg)_rotateX(10deg)] group-hover:[transform:rotateY(-5deg)_rotateX(4deg)_translateY(-6px)]">
-                      {c.art}
+                      <ServiceIcon name={c.icon} illustration className="h-full w-full" />
                     </div>
                   </div>
 
                   <div className="relative mt-6 flex items-center gap-4">
                     <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-bio shadow-[inset_0_0_14px_rgba(68,104,242,0.35)]">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        {c.icon}
-                      </svg>
+                      <ServiceIcon name={c.icon} className="h-7 w-7" />
                     </span>
                     <h3 className="font-display text-xl font-semibold">
                       {c.title}

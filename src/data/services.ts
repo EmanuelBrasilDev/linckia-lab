@@ -7,14 +7,7 @@
  *
  * Integração com /contato:
  * - `quoteHref(servico, nivel?)` gera `/contato?servico=<id>&nivel=<id>`.
- * - Enquanto a página de Contato não estiver pronta, `CONTACT_ENABLED` fica
- *   `false` e os botões de orçamento aparecem desativados ("em breve").
- *   Para ativar: implementar /contato lendo `servico` e `nivel` dos
- *   searchParams (use `SERVICE_IDS`/`LEVEL_IDS` para validar) e trocar a
- *   flag para `true`.
  */
-
-export const CONTACT_ENABLED = false;
 
 export const LEVEL_IDS = ["basico", "intermediario", "avancado"] as const;
 export type LevelId = (typeof LEVEL_IDS)[number];
@@ -381,7 +374,7 @@ export const startingPrice = (s: Service) => Math.min(...s.levels.map((l) => l.p
 export const formatPrice = (value: number) =>
   `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
 
-/** destino futuro do orçamento: /contato?servico=<id>&nivel=<id> */
+/** Destino do orçamento: /contato?servico=<id>&nivel=<id> */
 export const quoteHref = (service?: ServiceId, level?: LevelId) => {
   const q = new URLSearchParams();
   if (service) q.set("servico", service);

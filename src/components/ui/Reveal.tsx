@@ -47,12 +47,16 @@ const holding = () => performance.now() < holdUntil;
 const sweep = () => {
   if (holding()) return;
   const vh = window.innerHeight;
+  const reset: HTMLElement[] = [];
+  const reveal: HTMLElement[] = [];
   tracked.forEach((el) => {
     const r = el.getBoundingClientRect();
     const on = el.classList.contains("is-visible");
-    if (on && r.top >= vh) el.classList.remove("is-visible"); // totalmente abaixo
-    else if (!on && r.bottom <= 0) el.classList.add("is-visible"); // pulado por cima
+    if (on && r.top >= vh) reset.push(el);
+    else if (!on && r.bottom <= 0) reveal.push(el);
   });
+  for (const el of reset) el.classList.remove("is-visible");
+  for (const el of reveal) el.classList.add("is-visible");
 };
 const onScroll = () => {
   window.clearTimeout(idle);

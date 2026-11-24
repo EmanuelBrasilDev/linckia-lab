@@ -1,5 +1,7 @@
+import Link from "next/link";
 import Section from "@/components/ui/Section";
 import Reveal from "@/components/ui/Reveal";
+import { quoteHref } from "@/data/services";
 
 export default function FinalCta() {
   return (
@@ -20,18 +22,12 @@ export default function FinalCta() {
             Conte o que você tem em mente. Podemos conversar sobre como
             transformar seu projeto em uma experiência digital.
           </p>
-          {/*
-            TODO: canal de contato ainda não definido. Quando houver destino
-            válido (WhatsApp, e-mail ou /contato), trocar este indicador por
-            um <Link>/<a> real.
-          */}
-          <p
-            className="relative mx-auto mt-10 inline-flex items-center gap-2 rounded-full border border-dashed border-white/20 px-6 py-3 text-sm text-muted"
-            role="note"
+          <Link
+            href={quoteHref()}
+            className="relative mt-10 inline-flex items-center justify-center rounded-full bg-linckia px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_rgba(68,104,242,0.7)] transition-colors hover:bg-[#5576f5]"
           >
-            <span className="h-2 w-2 rounded-full bg-bio" aria-hidden="true" />
-            Canal de contato em breve
-          </p>
+            Solicitar orçamento
+          </Link>
         </div>
       </Reveal>
     </Section>

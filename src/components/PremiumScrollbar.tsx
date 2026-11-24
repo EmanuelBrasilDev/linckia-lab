@@ -64,14 +64,21 @@ export default function PremiumScrollbar() {
     if (!track || !thumb) return;
     const doc = document.documentElement;
     doc.classList.add("has-custom-scrollbar");
+    let previousY = -1;
+    let previousPercent = Number(thumb.getAttribute("aria-valuenow"));
 
     const place = () => {
       const { max, travel } = m.current;
-      const y = max > 0 ? (travel * Math.min(Math.max(window.scrollY, 0), max)) / max : 0;
-      thumb.style.transform = `translate3d(0, ${y}px, 0)`;
-      const pct = max > 0 ? Math.round((Math.min(window.scrollY, max) / max) * 100) : 0;
-      if (thumb.getAttribute("aria-valuenow") !== String(pct)) {
+      const fraction = max > 0 ? Math.min(Math.max(window.scrollY, 0), max) / max : 0;
+      const y = travel * fraction;
+      if (y !== previousY) {
+        thumb.style.transform = `translate3d(0, ${y}px, 0)`;
+        previousY = y;
+      }
+      const pct = Math.round(fraction * 100);
+      if (pct !== previousPercent) {
         thumb.setAttribute("aria-valuenow", String(pct));
+        previousPercent = pct;
       }
     };
 
@@ -79,11 +86,12 @@ export default function PremiumScrollbar() {
       const vh = doc.clientHeight;
       const sh = doc.scrollHeight;
       const max = sh - vh;
-      track.dataset.hidden = max <= 1 ? "true" : "false";
+      const hidden = max <= 1 ? "true" : "false";
+      if (track.dataset.hidden !== hidden) track.dataset.hidden = hidden;
       const th = track.clientHeight;
       const thumbH = Math.min(th, Math.max(MIN_THUMB, (th * vh) / Math.max(sh, 1)));
+      if (thumbH !== m.current.thumb || !thumb.style.height) thumb.style.height = `${thumbH}px`;
       m.current = { max: Math.max(0, max), travel: Math.max(0, th - thumbH), thumb: thumbH };
-      thumb.style.height = `${thumbH}px`;
       place();
     };
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { mountWebGLCanvas, releaseWebGLCanvas } from "@/components/graphics/webglCanvas";
 
 /**
  * Superfície líquida digital da página de Serviços.
@@ -33,6 +34,7 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform float uScroll;
 uniform float uDetail;
+uniform int uTrailCount;
 uniform vec4 uP[${TRAIL}];
 uniform vec2 uV[${TRAIL}];
 
@@ -41,15 +43,16 @@ float hash(vec2 p) {
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
-float noise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
+vec4 lattice(vec2 cell) {
+  return vec4(hash(cell), hash(cell + vec2(1.0, 0.0)),
+              hash(cell + vec2(0.0, 1.0)), hash(cell + vec2(1.0, 1.0)));
+}
+float interpolateNoise(vec4 corners, vec2 f) {
   vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-  float a = hash(i);
-  float b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0));
-  float d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+  return mix(mix(corners.x, corners.y, u.x), mix(corners.z, corners.w, u.x), u.y);
+}
+float noise(vec2 p) {
+  return interpolateNoise(lattice(floor(p)), fract(p));
 }
 const mat2 M = mat2(1.6, 1.2, -1.2, 1.6);
 float fbm(vec2 p) {
@@ -64,6 +67,32 @@ float fbm(vec2 p) {
   return s;
 }
 
+// As mesmas diferenças finitas de 0.02. Amostras na mesma célula
+// reaproveitam os quatro hashes, inclusive nas oitavas do ruído.
+vec3 surfaceSamples(vec2 p) {
+  vec2 px = p + vec2(0.02, 0.0);
+  vec2 py = p + vec2(0.0, 0.02);
+  vec3 samples = vec3(0.0);
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    if (i == 3 && uDetail < 0.5) break;
+    vec2 cell = floor(p);
+    vec2 cx = floor(px);
+    vec2 cy = floor(py);
+    vec4 corners = lattice(cell);
+    vec4 cornersX = all(equal(cell, cx)) ? corners : lattice(cx);
+    vec4 cornersY = all(equal(cell, cy)) ? corners : lattice(cy);
+    samples += a * vec3(interpolateNoise(corners, fract(p)),
+                        interpolateNoise(cornersX, fract(px)),
+                        interpolateNoise(cornersY, fract(py)));
+    p = M * p;
+    px = M * px;
+    py = M * py;
+    a *= 0.5;
+  }
+  return samples;
+}
+
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
   vec2 p = uv * 0.95;
@@ -71,6 +100,7 @@ void main() {
 
   // perturbações do cursor: arrasto na direção do movimento + leve redemoinho
   for (int i = 0; i < ${TRAIL}; i++) {
+    if (i >= uTrailCount) break;
     vec4 P = uP[i];
     vec2 d = uv - P.xy;
     float g = P.z * exp(-dot(d, d) / (P.w * P.w));
@@ -84,12 +114,9 @@ void main() {
     fbm(p + 3.0 * q + vec2(1.7, 9.2) + t * 0.6),
     fbm(p + 3.0 * q + vec2(8.3, 2.8) - t * 0.5)
   );
-  vec2 w = p + 2.2 * r;
-  float h = fbm(w);
-  float e = 0.02;
-  float hx = fbm(w + vec2(e, 0.0));
-  float hy = fbm(w + vec2(0.0, e));
-  vec3 n = normalize(vec3((h - hx) / e * 1.1, (h - hy) / e * 1.1, 1.0));
+  vec3 surface = surfaceSamples(p + 2.2 * r);
+  float h = surface.x;
+  vec3 n = normalize(vec3((vec2(h) - surface.yz) / 0.02 * 1.1, 1.0));
 
   // reflexos: brilho largo + núcleo quente, luz principal e contraluz
   vec3 V = vec3(0.0, 0.0, 1.0);
@@ -133,11 +160,14 @@ const SCALE = { desktop: [0.5, 0.4, 0.32], mobile: [0.45, 0.36, 0.28] };
 const MAX_PIXELS = 650_000;
 
 export default function LiquidField() {
-  const ref = useRef<HTMLCanvasElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const time = useRef<number | null>(null);
+  const [contextVersion, setContextVersion] = useState(0);
 
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
+    const host = ref.current;
+    if (!host) return;
+    const canvas = mountWebGLCanvas(host, "lk-liquid absolute inset-0 h-full w-full");
     const gl = canvas.getContext("webgl", {
       alpha: false,
       antialias: false,
@@ -146,10 +176,14 @@ export default function LiquidField() {
       premultipliedAlpha: false,
       preserveDrawingBuffer: false,
     });
-    if (!gl) return; // fallback CSS permanece visível
+    if (!gl) {
+      releaseWebGLCanvas(canvas, gl);
+      return; // fallback CSS permanece visível
+    }
 
     const hp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
     const precision = hp && hp.precision > 0 ? "highp" : "mediump";
+    const parallel = gl.getExtension("KHR_parallel_shader_compile");
     const shader = (type: number, src: string) => {
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
@@ -162,33 +196,38 @@ export default function LiquidField() {
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      gl.deleteProgram(prog);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      return;
-    }
-    gl.useProgram(prog);
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const aPos = gl.getAttribLocation(prog, "a_pos");
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    const uRes = gl.getUniformLocation(prog, "uRes");
-    const uTime = gl.getUniformLocation(prog, "uTime");
-    const uScroll = gl.getUniformLocation(prog, "uScroll");
-    const uDetail = gl.getUniformLocation(prog, "uDetail");
-    const uP = gl.getUniformLocation(prog, "uP");
-    const uV = gl.getUniformLocation(prog, "uV");
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+    const configure = () => {
+      gl.useProgram(prog);
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const aPos = gl.getAttribLocation(prog, "a_pos");
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+      return {
+        buffer,
+        resolution: gl.getUniformLocation(prog, "uRes"),
+        time: gl.getUniformLocation(prog, "uTime"),
+        scroll: gl.getUniformLocation(prog, "uScroll"),
+        detail: gl.getUniformLocation(prog, "uDetail"),
+        trailCount: gl.getUniformLocation(prog, "uTrailCount"),
+        positions: gl.getUniformLocation(prog, "uP"),
+        velocities: gl.getUniformLocation(prog, "uV"),
+      };
+    };
+    let bindings: ReturnType<typeof configure> | null = null;
 
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let reduced = motion.matches;
 
     // ---------- tamanho / qualidade ----------
     let quality = 0;
     let cssW = 0;
     let cssH = 0;
     const resize = () => {
+      if (!bindings) return;
       cssW = canvas.clientWidth;
       cssH = canvas.clientHeight;
       const mobile = cssW < 768;
@@ -201,23 +240,31 @@ export default function LiquidField() {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       gl.viewport(0, 0, w, h);
+      gl.uniform2f(bindings.resolution, w, h);
+      gl.uniform1f(bindings.detail, quality >= 2 ? 0 : 1);
     };
 
     // ---------- rastro do cursor (posições em unidades do shader) ----------
     const trail = Array.from({ length: TRAIL }, () => ({ x: 0, y: 0, vx: 0, vy: 0, born: -99, amp: 0 }));
     let head = 0;
-    let last = { x: 0, y: 0, t: 0, has: false };
+    const last = { x: 0, y: 0, t: 0, has: false };
     const P = new Float32Array(TRAIL * 4);
     const Vel = new Float32Array(TRAIL * 2);
-    let t = reduce ? 22 : 0;
+    let t = time.current ?? (reduced ? 22 : 0);
+    const savePointer = (x: number, y: number) => {
+      last.x = x;
+      last.y = y;
+      last.t = t;
+      last.has = true;
+    };
 
     const onPointer = (e: PointerEvent) => {
-      if (reduce || !cssH) return;
+      if (!cssH || lost || document.hidden) return;
       const x = (e.clientX - 0.5 * cssW) / cssH;
       const y = (cssH - e.clientY - 0.5 * cssH) / cssH;
       const now = t;
       if (!last.has) {
-        last = { x, y, t: now, has: true };
+        savePointer(x, y);
         return;
       }
       const dt = Math.max(now - last.t, 1 / 120);
@@ -240,7 +287,7 @@ export default function LiquidField() {
       p.born = now;
       p.amp = Math.min(1, 0.25 + sp * 0.6);
       head = (head + 1) % TRAIL;
-      last = { x, y, t: now, has: true };
+      savePointer(x, y);
     };
     const onLeave = () => {
       last.has = false;
@@ -248,25 +295,35 @@ export default function LiquidField() {
 
     // ---------- desenho ----------
     let scrollU = 0;
+    let previousTrailCount = 0;
     const draw = () => {
-      for (let i = 0; i < TRAIL; i++) {
-        const p = trail[i];
-        const age = t - p.born;
-        // sobe rápido, relaxa devagar e se espalha enquanto relaxa
-        const s = age < 0 || age > 4 ? 0 : p.amp * Math.min(1, age / 0.12) * Math.exp(-age * 1.15);
-        P[i * 4] = p.x;
-        P[i * 4 + 1] = p.y;
-        P[i * 4 + 2] = s * 0.15;
-        P[i * 4 + 3] = 0.1 + age * 0.05;
-        Vel[i * 2] = p.vx;
-        Vel[i * 2 + 1] = p.vy;
+      if (!bindings) return;
+      let count = 0;
+      if (!reduced) {
+        for (const p of trail) {
+          const age = t - p.born;
+          if (age <= 0 || age > 4) continue;
+          // sobe rápido, relaxa devagar e se espalha enquanto relaxa
+          const s = p.amp * Math.min(1, age / 0.12) * Math.exp(-age * 1.15);
+          P[count * 4] = p.x;
+          P[count * 4 + 1] = p.y;
+          P[count * 4 + 2] = s * 0.15;
+          P[count * 4 + 3] = 0.1 + age * 0.05;
+          Vel[count * 2] = p.vx;
+          Vel[count * 2 + 1] = p.vy;
+          count++;
+        }
       }
-      gl.uniform2f(uRes, canvas.width, canvas.height);
-      gl.uniform1f(uTime, t);
-      gl.uniform1f(uScroll, scrollU);
-      gl.uniform1f(uDetail, quality >= 2 ? 0 : 1);
-      gl.uniform4fv(uP, P);
-      gl.uniform2fv(uV, Vel);
+      if (count !== previousTrailCount) {
+        gl.uniform1i(bindings.trailCount, count);
+        previousTrailCount = count;
+      }
+      if (count) {
+        gl.uniform4fv(bindings.positions, P);
+        gl.uniform2fv(bindings.velocities, Vel);
+      }
+      gl.uniform1f(bindings.time, t);
+      gl.uniform1f(bindings.scroll, scrollU);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
 
@@ -276,13 +333,6 @@ export default function LiquidField() {
       shown = true;
       canvas.dataset.ready = "true";
     };
-
-    resize();
-    const ro = new ResizeObserver(() => {
-      resize();
-      if (reduce) draw();
-    });
-    ro.observe(canvas);
 
     // qualidade adaptativa (mesma política da Home): janelas de 2 s, só desce
     let winFrames = 0;
@@ -304,61 +354,108 @@ export default function LiquidField() {
     let raf = 0;
     let prev = 0;
     let lost = false;
-    const loop = (now: number) => {
-      raf = requestAnimationFrame(loop);
+    let needsResize = true;
+    const syncFrame = () => {
       if (lost || document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
         prev = 0;
-        return;
+        winFrames = winSlow = winTime = 0;
+        last.has = false;
+      } else if (!raf) {
+        raf = requestAnimationFrame(loop);
       }
-      const dtMs = prev ? now - prev : 0;
-      prev = now;
-      adapt(dtMs);
-      t += Math.min(dtMs, 100) / 1000;
-      // leve paralaxe: a superfície acompanha 40% da rolagem
-      scrollU = (window.scrollY / Math.max(cssH, 1)) * 1.35 * 0.4;
+    };
+    const loop = (now: number) => {
+      raf = 0;
+      if (lost || document.hidden) return;
+      if (!bindings) {
+        // A consulta de conclusão é não bloqueante. O fallback permanece
+        // visível até o primeiro quadro válido da superfície.
+        if (parallel && !gl.getProgramParameter(prog, parallel.COMPLETION_STATUS_KHR)) {
+          syncFrame();
+          return;
+        }
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          lost = true;
+          gl.deleteProgram(prog);
+          releaseWebGLCanvas(canvas, gl);
+          return;
+        }
+        bindings = configure();
+      }
+      if (needsResize) {
+        resize();
+        needsResize = false;
+      }
+      if (!reduced) {
+        const dtMs = prev ? now - prev : 0;
+        prev = now;
+        adapt(dtMs);
+        t += Math.min(dtMs, 100) / 1000;
+        // leve paralaxe: a superfície acompanha 40% da rolagem
+        scrollU = (window.scrollY / Math.max(cssH, 1)) * 1.35 * 0.4;
+      }
       draw();
       reveal();
+      if (!reduced) syncFrame();
     };
 
+    const ro = new ResizeObserver(() => {
+      needsResize = true;
+      syncFrame();
+    });
+    ro.observe(canvas);
+
+    const syncMotion = () => {
+      prev = 0;
+      reduced = motion.matches;
+      if (reduced) {
+        window.removeEventListener("pointermove", onPointer);
+        window.removeEventListener("pointerdown", onPointer);
+        document.documentElement.removeEventListener("pointerleave", onLeave);
+        last.has = false;
+        for (const p of trail) p.born = -99;
+      } else {
+        window.addEventListener("pointermove", onPointer, { passive: true });
+        window.addEventListener("pointerdown", onPointer, { passive: true });
+        document.documentElement.addEventListener("pointerleave", onLeave);
+      }
+      syncFrame();
+    };
     const onLost = (e: Event) => {
       e.preventDefault();
       lost = true;
       delete canvas.dataset.ready; // volta ao fallback CSS
+      syncFrame();
     };
+    const onRestored = () => setContextVersion((version) => version + 1);
     canvas.addEventListener("webglcontextlost", onLost);
-
-    if (reduce) {
-      draw();
-      reveal();
-    } else {
-      window.addEventListener("pointermove", onPointer, { passive: true });
-      window.addEventListener("pointerdown", onPointer, { passive: true });
-      document.documentElement.addEventListener("pointerleave", onLeave);
-      raf = requestAnimationFrame(loop);
-    }
+    canvas.addEventListener("webglcontextrestored", onRestored);
+    document.addEventListener("visibilitychange", syncFrame);
+    motion.addEventListener("change", syncMotion);
+    syncMotion();
 
     return () => {
       cancelAnimationFrame(raf);
+      time.current = t;
       ro.disconnect();
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
       document.documentElement.removeEventListener("pointerleave", onLeave);
+      document.removeEventListener("visibilitychange", syncFrame);
+      motion.removeEventListener("change", syncMotion);
       canvas.removeEventListener("webglcontextlost", onLost);
-      // libera os recursos da GPU (rota oculta pelo Activity ou desmontada)
-      gl.deleteBuffer(buf);
+      canvas.removeEventListener("webglcontextrestored", onRestored);
+      gl.deleteBuffer(bindings?.buffer ?? null);
       gl.deleteProgram(prog);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      canvas.width = 1;
-      canvas.height = 1;
-      delete canvas.dataset.ready;
+      releaseWebGLCanvas(canvas, gl);
     };
-  }, []);
+  }, [contextVersion]);
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
+    <div ref={ref} aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
       <div className="lk-liquid-fallback absolute inset-0" />
-      <canvas ref={ref} className="lk-liquid absolute inset-0 h-full w-full" />
     </div>
   );
 }
