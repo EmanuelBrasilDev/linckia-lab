@@ -31,7 +31,21 @@ let resetIO: IntersectionObserver | null = null;
  */
 const tracked = new Set<HTMLElement>();
 let idle = 0;
+
+/**
+ * Suspende os REINÍCIOS por `ms` (as entradas continuam funcionando). Usado
+ * quando o próprio layout empurra conteúdo para baixo da viewport — ex.: um
+ * painel expansível abrindo — para que esse deslocamento não conte como
+ * "o visitante saiu e voltou" e não reinicie a animação indevidamente.
+ */
+let holdUntil = 0;
+export function holdRevealReset(ms: number) {
+  holdUntil = Math.max(holdUntil, performance.now() + ms);
+}
+const holding = () => performance.now() < holdUntil;
+
 const sweep = () => {
+  if (holding()) return;
   const vh = window.innerHeight;
   tracked.forEach((el) => {
     const r = el.getBoundingClientRect();
@@ -58,6 +72,7 @@ function observers() {
     );
     resetIO = new IntersectionObserver(
       (entries) => {
+        if (holding()) return;
         for (const e of entries) {
           const vh = e.rootBounds?.height ?? window.innerHeight;
           if (!e.isIntersecting && e.boundingClientRect.top >= vh) {
