@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --abyss: #080d21;
+  --abyss-2: #0c1330;
+  --linckia: #4468f2;
+  --bio: #00d9c1;
+  --ink: #eef1fb;
+  --muted: #9aa5c7;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-abyss: var(--abyss);
+  --color-abyss-2: var(--abyss-2);
+  --color-linckia: var(--linckia);
+  --color-bio: var(--bio);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  overflow-x: clip; /* nenhum glow decorativo amplia a viewport no mobile */
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  background: var(--abyss);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--abyss);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--linckia);
+  color: #fff;
+}
+
+/* Scroll reveal: só oculta quando há scripting disponível */
+@media (scripting: enabled) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms),
+      transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+:focus-visible {
+  outline: 2px solid var(--bio);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/*
+ * Cursor da marca — apenas para mouse/ponteiro preciso.
+ * Hotspot (2 2) = ponta da seta. PNG 1x/2x via image-set para nitidez em
+ * telas de alta densidade; o SVG fica como fallback.
+ */
+@media (hover: hover) and (pointer: fine) {
+  html {
+    cursor: url("/cursors/cursor.svg") 2 2, auto;
+    cursor: -webkit-image-set(url("/cursors/cursor.png") 1x, url("/cursors/cursor@2x.png") 2x) 2 2, auto;
+    cursor: image-set(url("/cursors/cursor.png") 1x, url("/cursors/cursor@2x.png") 2x) 2 2, auto;
+  }
+
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select,
+  [data-cursor="interactive"] {
+    cursor: url("/cursors/cursor-hover.svg") 2 2, pointer;
+    cursor: -webkit-image-set(url("/cursors/cursor-hover.png") 1x, url("/cursors/cursor-hover@2x.png") 2x) 2 2, pointer;
+    cursor: image-set(url("/cursors/cursor-hover.png") 1x, url("/cursors/cursor-hover@2x.png") 2x) 2 2, pointer;
+  }
+
+  /* campos editáveis mantêm o cursor de texto nativo */
+  input:not([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  textarea,
+  [contenteditable]:not([contenteditable="false"]) {
+    cursor: text;
+  }
+
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
