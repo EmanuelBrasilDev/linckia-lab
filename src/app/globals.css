@@ -75,14 +75,14 @@ body {
 
 /*
  * Cursor da marca — apenas para mouse/ponteiro preciso.
- * Hotspot (2 2) = ponta da seta. PNG 1x/2x via image-set para nitidez em
- * telas de alta densidade; o SVG fica como fallback.
+ * Hotspot (2 2) = ponta da seta. Somente o SVG de 28x28: o Chromium descarta
+ * cursores personalizados cujo bitmap passa de 32px quando a imagem encosta
+ * na borda da viewport (caso da scrollbar à direita); um PNG @2x de 56px
+ * disparava isso. O SVG é vetorial e nítido em qualquer densidade.
  */
 @media (hover: hover) and (pointer: fine) {
   html {
     cursor: url("/cursors/cursor.svg") 2 2, auto;
-    cursor: -webkit-image-set(url("/cursors/cursor.png") 1x, url("/cursors/cursor@2x.png") 2x) 2 2, auto;
-    cursor: image-set(url("/cursors/cursor.png") 1x, url("/cursors/cursor@2x.png") 2x) 2 2, auto;
   }
 
   a[href],
@@ -93,8 +93,6 @@ body {
   select,
   [data-cursor="interactive"] {
     cursor: url("/cursors/cursor-hover.svg") 2 2, pointer;
-    cursor: -webkit-image-set(url("/cursors/cursor-hover.png") 1x, url("/cursors/cursor-hover@2x.png") 2x) 2 2, pointer;
-    cursor: image-set(url("/cursors/cursor-hover.png") 1x, url("/cursors/cursor-hover@2x.png") 2x) 2 2, pointer;
   }
 
   /* campos editáveis mantêm o cursor de texto nativo */
@@ -108,6 +106,45 @@ body {
   [aria-disabled="true"] {
     cursor: not-allowed;
   }
+
+  /*
+   * Scrollbar da marca: na borda direita o Chromium recusa o cursor CSS (a
+   * imagem não cabe na viewport) e mostraria a seta do sistema. Ali o cursor
+   * do sistema é ocultado e o PremiumScrollbar desenha o mesmo SVG
+   * (.lk-soft-cursor). Vale também durante todo o arraste.
+   */
+  .lk-scrollbar,
+  .lk-scrollbar * {
+    cursor: none !important;
+  }
+  html[data-lk-drag="true"],
+  html[data-lk-drag="true"] * {
+    cursor: none !important;
+    user-select: none !important;
+  }
+}
+
+.lk-soft-cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  overflow: hidden; /* a seta cortada na borda não cria overflow */
+  pointer-events: none;
+  contain: layout paint;
+  display: none;
+}
+.lk-soft-cursor[data-on="true"] {
+  display: block;
+}
+.lk-soft-cursor img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  max-width: none;
+  will-change: transform;
+  user-select: none;
 }
 
 /*
@@ -122,6 +159,7 @@ html.has-custom-scrollbar::-webkit-scrollbar {
 }
 
 .lk-scrollbar {
+  user-select: none;
   position: fixed;
   top: 0;
   right: 0;
@@ -129,7 +167,6 @@ html.has-custom-scrollbar::-webkit-scrollbar {
   z-index: 90;
   width: 18px; /* área interativa maior que o visual */
   padding: 4px 0;
-  cursor: inherit; /* mantém o cursor da marca sobre o trilho */
 }
 .lk-scrollbar[data-hidden="true"] {
   display: none;
@@ -150,7 +187,6 @@ html.has-custom-scrollbar::-webkit-scrollbar {
   top: 4px;
   right: 0;
   width: 18px;
-  cursor: inherit;
   will-change: transform;
   touch-action: none;
   outline: none;

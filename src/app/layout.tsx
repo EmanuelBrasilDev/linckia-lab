@@ -3,7 +3,7 @@ import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import Scrollbar from "@/components/Scrollbar";
+import PremiumScrollbar from "@/components/PremiumScrollbar";
 
 const display = Outfit({
   variable: "--font-display",
@@ -51,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </main>
         <Footer />
-        <Scrollbar />
+        <PremiumScrollbar />
       </body>
     </html>
   );
